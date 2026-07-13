@@ -1,0 +1,16 @@
+# 忽略指定工程下的 MDK 编译输出文件夹
+mdk/DebugConfig/
+mdk/Listings/
+mdk/Objects/
+mdk/RTE/
+
+# 忽略所有后缀为 .scvd 的事件记录器文件
+*.scvd
+
+# 忽略所有后缀为 .Huangliyuan 的用户文件
+.Huangliyuan
+
+# 建议一并忽略 Keil 产生的其他常见临时文件
+*.uvgui.*
+*.uvguix.*
+*.dep
