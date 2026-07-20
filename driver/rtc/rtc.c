@@ -1,6 +1,7 @@
 #include <string.h>
+#include "FreeRTOS.h"
+#include "task.h"
 #include "stm32f4xx.h"
-#include "cpu_tick.h"
 #include "rtc.h"
 
 void rtc_init(void)
@@ -58,7 +59,7 @@ void rtc_set_time(const rtc_date_time_t *date_time)
 		rtc_date_time_t rtime;
 		do {
 				_rtc_set_time_once(date_time);
-					cpu_delay_ms(10);
+				vTaskDelay(pdMS_TO_TICKS(10));
 				_rtc_get_time_once(&rtime);
 		} while (date_time->second != rtime.second);
 }

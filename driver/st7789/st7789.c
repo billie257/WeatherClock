@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
 #include "stm32f4xx.h"
 #include "cpu_tick.h"
 #include "st7789.h"
@@ -26,8 +29,7 @@
 #define MOSI_PORT     GPIOA
 #define MOSI_PIN      GPIO_Pin_7
 
-#define delay_us(x) cpu_delay_us(x)
-#define delay_ms(x) cpu_delay_ms(x)
+static SemaphoreHandle_t write_gram_semaphore;
 
 static void st7789_init_display(void);
 
@@ -90,16 +92,27 @@ static void st7789_dma_init(void)
 		DMA_InitStruct.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
 		DMA_InitStruct.DMA_MemoryBurst = DMA_MemoryBurst_INC8;
 		DMA_InitStruct.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+	  DMA_ITConfig(DMA2_Stream3, DMA_IT_TC, ENABLE);
 		DMA_Init(DMA2_Stream3, &DMA_InitStruct);
 }
 
 static void st7789_int_init(void)
 {
-		// NVIC DMA_INT
+		NVIC_InitTypeDef NVIC_InitStruct;
+		NVIC_InitStruct.NVIC_IRQChannel = DMA2_Stream3_IRQn;
+		NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 5;
+		NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
+		NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+		NVIC_Init(&NVIC_InitStruct);
+	
+	  NVIC_SetPriority(DMA2_Stream3_IRQn, 5);
 }
 
 void st7789_init(void)
 {
+		write_gram_semaphore = xSemaphoreCreateBinary();
+		configASSERT(write_gram_semaphore);
+	
 	  st7789_spi_init();
 		st7789_dma_init();
 		st7789_int_init();
@@ -149,8 +162,9 @@ static void st7789_write_gram(uint8_t data[], uint32_t length, bool singlecolor)
 				DMA2_Stream3->NDTR = chunk_size;
 			
 				DMA_Cmd(DMA2_Stream3, ENABLE);
-				while (DMA_GetFlagStatus(DMA2_Stream3, DMA_FLAG_TCIF3) == RESET);
-				DMA_ClearFlag(DMA2_Stream3, DMA_FLAG_TCIF3);
+				xSemaphoreTake(write_gram_semaphore, portMAX_DELAY);
+//				while (DMA_GetFlagStatus(DMA2_Stream3, DMA_FLAG_TCIF3) == RESET);
+//				DMA_ClearFlag(DMA2_Stream3, DMA_FLAG_TCIF3);
 			
 				if (!singlecolor) 
 						data += chunk_size * 2;
@@ -164,21 +178,20 @@ static void st7789_write_gram(uint8_t data[], uint32_t length, bool singlecolor)
 static void st7789_reset(void)
 {
 		GPIO_ResetBits(RESET_PORT, RESET_PIN);
-		delay_us(20);
+		vTaskDelay(pdMS_TO_TICKS(2));  // 20us at least
 		GPIO_SetBits(RESET_PORT, RESET_PIN);
-		delay_ms(120);
+		vTaskDelay(pdMS_TO_TICKS(120));
 }
 
 static void st7789_init_display(void)
-{
-		//GPIO_SetBits(SCK_PORT, SCK_PIN);	
+{	
 		st7789_reset();
 		
 		st7789_write_register(0x01, NULL, 0); //Software Reset
-		delay_ms(120);
+		vTaskDelay(pdMS_TO_TICKS(120));
 						
 		st7789_write_register(0x11, NULL, 0); //Sleep Out
-		delay_ms(5);               //DELAY120ms
+		vTaskDelay(pdMS_TO_TICKS(5));           
 	
 		//-----------------------ST7789V Frame rate setting-----------------//
 		//************************************************
@@ -220,7 +233,7 @@ static void st7789_init_display(void)
 		st7789_write_register(0XE1, (uint8_t[]){0xD0,0x05,0x09,0x09,0x08,0x03,0x24,0x32,0x32,0x3B,0x14,0x13,0x28,0x2F}, 14);//Set Gamma
 
 		st7789_write_register(0x20, NULL, 0); // Inverse display
-		delay_ms(120);       
+		vTaskDelay(pdMS_TO_TICKS(120));      
 		st7789_write_register(0x29, NULL, 0); //turn on inverse display
 		
 		st7789_fill_color(0, 0, ST7789_WIDTH - 1, ST7789_HEIGHT - 1, 0x0000);
@@ -390,4 +403,16 @@ void st7789_draw_image(uint16_t x, uint16_t y, const image_t *image)
 		
 		st7789_set_window_and_prepare_gram(x, y, x + image->width - 1, y + image->height - 1);	
 		st7789_write_gram((uint8_t *)image->data, image->width * image->height * 2, false);
+}
+
+void DMA2_Stream3_IRQHandler(void)
+{
+		if (DMA_GetITStatus(DMA2_Stream3, DMA_IT_TCIF3) == SET)
+		{
+				BaseType_t pxHigherPriorityTaskWoken;
+				xSemaphoreGiveFromISR(write_gram_semaphore, &pxHigherPriorityTaskWoken);
+			  portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+			
+				DMA_ClearITPendingBit(DMA2_Stream3, DMA_IT_TCIF3);
+		}
 }

@@ -1,7 +1,10 @@
 #include <string.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
 #include "stm32f4xx.h"
 #include "console.h"
 
+static SemaphoreHandle_t write_async_semaphore;
 static console_received_func_t received_func;
 
 static void console_io_init(void)
@@ -53,6 +56,7 @@ static void console_dma_init(void)
 		DMA_InitStruct.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
 		DMA_InitStruct.DMA_MemoryBurst = DMA_MemoryBurst_INC8;
 		DMA_InitStruct.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+		DMA_ITConfig(DMA2_Stream7, DMA_IT_TC, ENABLE);
 		DMA_Init(DMA2_Stream7, &DMA_InitStruct);
 }
 
@@ -64,10 +68,18 @@ static void console_int_init(void)
 		NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
 		NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
 		NVIC_Init(&NVIC_InitStruct);
+		NVIC_SetPriority(USART1_IRQn, 5);
+	
+		NVIC_InitStruct.NVIC_IRQChannel = DMA2_Stream7_IRQn;
+		NVIC_Init(&NVIC_InitStruct);
+		NVIC_SetPriority(DMA2_Stream7_IRQn, 5);
 }
 
 void console_init(void)
 {
+		write_async_semaphore = xSemaphoreCreateBinary();
+	  configASSERT(write_async_semaphore);
+	
 		console_usart_init();
 		console_dma_init();
 		console_int_init();
@@ -83,9 +95,10 @@ void console_write(const char str[])
 				DMA2_Stream7->M0AR = (uint32_t)str;
 				DMA2_Stream7->NDTR = chunk_size;
 			
-				DMA_Cmd(DMA2_Stream7, ENABLE);
-				while (DMA_GetFlagStatus(DMA2_Stream7, DMA_FLAG_TCIF7) == RESET);
-				DMA_ClearFlag(DMA2_Stream7, DMA_FLAG_TCIF7);	
+				DMA_Cmd(DMA2_Stream7, ENABLE);		
+				xSemaphoreTake(write_async_semaphore, portMAX_DELAY);
+//				while (DMA_GetFlagStatus(DMA2_Stream7, DMA_FLAG_TCIF7) == RESET);
+//				DMA_ClearFlag(DMA2_Stream7, DMA_FLAG_TCIF7);		
 			
 				str += chunk_size;
 				len -= chunk_size;		
@@ -102,7 +115,7 @@ void console_received_callback_register(console_received_func_t func)
 
 void USART1_IRQHandler(void)
 {
-		if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
+		if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
 		{
 			 if (received_func != NULL)
 			 {
@@ -112,4 +125,16 @@ void USART1_IRQHandler(void)
 			 
 			 USART_ClearITPendingBit(USART1, USART_IT_RXNE);
 		}		
+}
+
+void DMA2_Stream7_IRQHandler(void)
+{
+		if (DMA_GetITStatus(DMA2_Stream7, DMA_IT_TCIF7) == SET)
+		{
+				BaseType_t pxHigherPriorityTaskWoken;
+				xSemaphoreGiveFromISR(write_async_semaphore, &pxHigherPriorityTaskWoken);
+			  portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+			
+				DMA_ClearITPendingBit(DMA2_Stream7, DMA_IT_TCIF7);
+		}
 }

@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include "FreeRTOS.h"
+#include "task.h"
 #include "stm32f4xx.h"
 #include "cpu_tick.h"
 #include "console.h"
@@ -26,8 +28,7 @@ void board_lowlevel_init(void)
 }
 
 void board_init(void)
-{	
-		cpu_tick_init();		
+{		
 	  console_init();
 		rtc_init();
 		aht20_init();
@@ -40,4 +41,22 @@ int fputc(int ch, FILE *f)
     USART_SendData(USART1, (uint8_t)ch);
     while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
     return ch;
+}
+
+void vAssertCalled(const char *file, int line)
+{
+	  portDISABLE_INTERRUPTS();
+		printf("Assert Called: %s(%d)\n", file, line);	
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+		printf("Stack Overflowed: %s\n", pcTaskName);
+		configASSERT(0);
+}
+
+void vApplicationMallocFailedHook(void)
+{
+		printf("Malloc Failed\n");
+		configASSERT(0);
 }

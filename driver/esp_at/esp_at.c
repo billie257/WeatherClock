@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "FreeRTOS.h"
+#include "task.h"
 #include "stm32f4xx.h"
 #include "cpu_tick.h"
 #include "esp_at.h"
@@ -106,14 +108,14 @@ static at_ack_t esp_at_usart_wait_receive(uint32_t timeout)
 {
 			uint32_t rxlen = 0;
 			const char *line = rxbuf;
-			uint64_t start = cpu_get_ms();		
+			uint32_t start = xTaskGetTickCount();		
 
 		rxbuf[0] = '\0';
 		while (rxlen < sizeof(rxbuf) - 1)
 		{			
 				while (USART_GetFlagStatus(USART2, USART_FLAG_RXNE) == RESET)
 				{
-						if (cpu_get_ms() - start >= timeout)
+						if (xTaskGetTickCount() - start >= timeout)
 							return AT_ACK_NONE;
 				}
 				rxbuf[rxlen++] = USART_ReceiveData(USART2);
