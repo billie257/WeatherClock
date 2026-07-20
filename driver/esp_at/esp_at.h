@@ -26,9 +26,6 @@ typedef struct
 } esp_date_time_t;
 
 bool esp_at_init(void);
-bool esp_at_wait_ready(uint32_t timeout);
-bool esp_at_write_command(const char *command, uint32_t timeout);
-const char *esp_at_get_reponse(void);
 bool esp_at_wifi_init(void);
 bool esp_at_connect_wifi(const char *ssid, const char *pwd, const char *mac);
 bool esp_at_get_wifi_info(esp_wifi_info_t *info);

@@ -26,12 +26,11 @@
 
 #define LOOP_EVT_TIME_SYNC   	    (1 << 0)
 #define LOOP_EVT_WIFI_UPDATE   	  (1 << 1)
-#define LOOP_EVT_TIME_UPDATE   	  (1 << 2)
-#define LOOP_EVT_INNER_UPDATE   	(1 << 3)
-#define LOOP_EVT_OUTDOOR_UPDATE   (1 << 4)
+//#define LOOP_EVT_TIME_UPDATE   	  (1 << 2)
+#define LOOP_EVT_INNER_UPDATE   	(1 << 2)
+#define LOOP_EVT_OUTDOOR_UPDATE   (1 << 3)
 #define LOOP_EVT_ALL              (LOOP_EVT_TIME_SYNC   	      |\
 																	 LOOP_EVT_WIFI_UPDATE         |\
-																	 LOOP_EVT_TIME_UPDATE         |\
 																	 LOOP_EVT_INNER_UPDATE        |\
 																	 LOOP_EVT_OUTDOOR_UPDATE)
 
@@ -77,12 +76,14 @@ static void time_sync(void)
 		
 err:
 		xTimerChangePeriod(time_sync_timer, pdMS_TO_TICKS(restart_sync_delay), 0);
-		xTaskNotify(loop_task, LOOP_EVT_TIME_UPDATE, eSetBits);
+		//xTaskNotify(loop_task, LOOP_EVT_TIME_UPDATE, eSetBits);
 }
 
 static void wifi_update(void)
 {
 		static esp_wifi_info_t last_info = { 0 };
+		
+		//xTimerChangePeriod(wifi_update_timer, pdMS_TO_TICKS(WIFI_UPDATE_INTERVAL), 0);		
 	
 		esp_wifi_info_t info = { 0 };
 		if (!esp_at_get_wifi_info(&info))
@@ -110,19 +111,20 @@ static void wifi_update(void)
 			 main_page_redraw_wifi_ssid("wifi lost");
 		}
 		
-		memcpy(&last_info, &info, sizeof(esp_wifi_info_t));
-		
-		xTimerChangePeriod(wifi_update_timer, pdMS_TO_TICKS(WIFI_UPDATE_INTERVAL), 0);		
+		memcpy(&last_info, &info, sizeof(esp_wifi_info_t));		
 }
 
 static void time_update(void)
 {
 		static rtc_date_time_t last_date = { 0 };
 		
-		xTimerChangePeriod(time_update_timer, pdMS_TO_TICKS(TIME_UPDATE_INTERVAL), 0);		
-		
+		//xTimerChangePeriod(time_update_timer, pdMS_TO_TICKS(TIME_UPDATE_INTERVAL), 0);		
+	
 		rtc_date_time_t date;
 		rtc_get_time(&date);
+		
+		if (date.year < 2000)
+				return;
 		
 		if (memcmp(&last_date, &date, sizeof(rtc_date_time_t)) == 0)
 				return;
@@ -136,7 +138,7 @@ static void inner_update(void)
 {
 		static float last_temperature, last_humidity;
 		
-		xTimerChangePeriod(inner_update_timer, pdMS_TO_TICKS(INNER_UPDATE_INTERVAL), 0);		
+		//xTimerChangePeriod(inner_update_timer, pdMS_TO_TICKS(INNER_UPDATE_INTERVAL), 0);		
 		
 		if (!aht20_start_measurement())
 		{
@@ -173,7 +175,7 @@ static void outdoor_update(void)
 {
 		static weather_info_t last_weather = { 0 };
 		
-		xTimerChangePeriod(outdoor_update_timer, pdMS_TO_TICKS(OUTDOOR_UPDATE_INTERVAL), 0);		
+		//xTimerChangePeriod(outdoor_update_timer, pdMS_TO_TICKS(OUTDOOR_UPDATE_INTERVAL), 0);		
 		weather_info_t weather = { 0 };
 		const char *weather_url = WEATHER_URL;
 		const char *weather_http_response = esp_at_http_get(weather_url);
@@ -210,8 +212,8 @@ static void loop_func(void *param)
 						time_sync();
 				if (event & LOOP_EVT_WIFI_UPDATE)
 						wifi_update();
-				if (event & LOOP_EVT_TIME_UPDATE)
-						time_update();
+//				if (event & LOOP_EVT_TIME_UPDATE)
+//						time_update();
 				if (event & LOOP_EVT_INNER_UPDATE)
 						inner_update();	
 				if (event & LOOP_EVT_OUTDOOR_UPDATE)
@@ -226,11 +228,16 @@ static void loop_timer_cb(TimerHandle_t timer)
 		xTaskNotify(loop_task, event, eSetBits);
 }
 
+static void time_update_cb(TimerHandle_t timer)
+{
+		time_update();
+}
+
 void main_loop_init(void)
 {
+		time_update_timer = xTimerCreate("time update", pdMS_TO_TICKS(TIME_UPDATE_INTERVAL), pdTRUE, NULL, time_update_cb);
 		time_sync_timer = xTimerCreate("time sync", 1, pdFALSE, (void *)LOOP_EVT_TIME_SYNC, loop_timer_cb);
 		wifi_update_timer = xTimerCreate("wifi update", pdMS_TO_TICKS(WIFI_UPDATE_INTERVAL), pdTRUE, (void *)LOOP_EVT_WIFI_UPDATE, loop_timer_cb);
-		time_update_timer = xTimerCreate("time update", pdMS_TO_TICKS(TIME_UPDATE_INTERVAL), pdTRUE, (void *)LOOP_EVT_TIME_UPDATE, loop_timer_cb);
 		inner_update_timer = xTimerCreate("inner update", pdMS_TO_TICKS(INNER_UPDATE_INTERVAL), pdTRUE, (void *)LOOP_EVT_INNER_UPDATE, loop_timer_cb);
 		outdoor_update_timer = xTimerCreate("outdoor update", pdMS_TO_TICKS(OUTDOOR_UPDATE_INTERVAL), pdTRUE, (void *)LOOP_EVT_OUTDOOR_UPDATE, loop_timer_cb);	
 
