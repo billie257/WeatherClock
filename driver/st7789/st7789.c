@@ -6,7 +6,6 @@
 #include "task.h"
 #include "semphr.h"
 #include "stm32f4xx.h"
-#include "cpu_tick.h"
 #include "st7789.h"
 #include "font.h"
 #include "image.h"

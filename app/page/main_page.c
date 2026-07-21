@@ -1,12 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "st7789.h"
-#include "font.h"
-#include "image.h"
+#include "rtc.h"
+#include "wifi.h"
+#include "ui.h"
 #include "page.h"
 #include "app.h"
-#include "rtc.h"
 
 static const uint16_t color_bg_time = mkcolor(248, 248, 248);
 static const uint16_t color_bg_inner = mkcolor(136, 217, 234);
@@ -14,32 +13,32 @@ static const uint16_t color_bg_outdoor = mkcolor(254, 135, 75);
 
 void main_page_display(void)
 {
-		st7789_fill_color(0, 0, ST7789_WIDTH - 1, ST7789_HEIGHT - 1, BLACK);
+		ui_fill_color(0, 0, UI_WIDTH - 1, UI_HEIGHT - 1, BLACK);
 	
 		do {
-				st7789_fill_color(15, 15, 224, 154, color_bg_time);
+				ui_fill_color(15, 15, 224, 154, color_bg_time);
 				// wifi 图标
-				st7789_draw_image(23, 20, &icon_wifi);		
+				ui_draw_image(23, 20, &icon_wifi);		
 				main_page_redraw_wifi_ssid(WIFI_SSID);
 				 // 时间
-				st7789_write_string(25, 42, "--:--", BLACK, color_bg_time, &font76_maple_extrabold);
+				ui_write_string(25, 42, "--:--", BLACK, color_bg_time, &font76_maple_extrabold);
 				// 日期
-				st7789_write_string(35, 121, "----/--/-- 星期五", mkcolor(143,143,143), color_bg_time, &font20_maple_bold);
+				ui_write_string(35, 121, "----/--/-- 星期五", mkcolor(143,143,143), color_bg_time, &font20_maple_bold);
 		} while (0);
 	
 		do {
-					st7789_fill_color(15, 165, 114, 304, color_bg_inner);
-					st7789_write_string(19, 170, "室内环境", BLACK, color_bg_inner, &font24_maple_bold);
-					st7789_write_string(86, 191, "C", BLACK, color_bg_inner, &font32_maple_bold);
-					st7789_write_string(91, 262, "%", BLACK, color_bg_inner, &font32_maple_bold);
+					ui_fill_color(15, 165, 114, 304, color_bg_inner);
+					ui_write_string(19, 170, "室内环境", BLACK, color_bg_inner, &font24_maple_bold);
+					ui_write_string(86, 191, "C", BLACK, color_bg_inner, &font32_maple_bold);
+					ui_write_string(91, 262, "%", BLACK, color_bg_inner, &font32_maple_bold);
 					main_page_redraw_inner_temperature(999.9f);
 					main_page_redraw_inner_humidity(999.9f);
 			} while (0);
 		
 		do {
-					st7789_fill_color(125, 165, 224, 304, color_bg_outdoor);
-					st7789_write_string(192, 189, "C", BLACK, color_bg_outdoor, &font32_maple_bold);
-					st7789_draw_image(139, 239, &icon_wenduji);
+					ui_fill_color(125, 165, 224, 304, color_bg_outdoor);
+					ui_write_string(192, 189, "C", BLACK, color_bg_outdoor, &font32_maple_bold);
+					ui_draw_image(139, 239, &icon_wenduji);
 					main_page_redraw_outdoor_city("深圳");
 					main_page_redraw_outdoor_temperature(999.9f);
 					main_page_redraw_outdoor_weather_icon(-1);		
@@ -50,7 +49,7 @@ void main_page_redraw_wifi_ssid(const char *ssid)
 {
 			char str[21];
 			snprintf(str, sizeof(str), "%20s", ssid);
-			st7789_write_string(50, 23, str, mkcolor(143,143,143), color_bg_time, &font16_maple);	
+			ui_write_string(50, 23, str, mkcolor(143,143,143), color_bg_time, &font16_maple);	
 }
 
 void main_page_redraw_time(rtc_date_time_t *time)
@@ -58,7 +57,7 @@ void main_page_redraw_time(rtc_date_time_t *time)
 			char str[6];
 			char comma = (time->second % 2 == 0) ? ':' : ' ';
 			snprintf(str, sizeof(str), "%02u%c%02u", time->hour, comma, time->minute);
-			st7789_write_string(25, 42, str, BLACK, color_bg_time, &font76_maple_extrabold);	
+			ui_write_string(25, 42, str, BLACK, color_bg_time, &font76_maple_extrabold);	
 }
 
 void main_page_redraw_date(rtc_date_time_t *date)
@@ -72,7 +71,7 @@ void main_page_redraw_date(rtc_date_time_t *date)
 				date->weekday == 5 ? "五":
 				date->weekday == 6 ? "六":
 				date->weekday == 7 ? "天": "X");
-			st7789_write_string(35, 121, str, mkcolor(143,143,143), color_bg_time, &font20_maple_bold);	
+			ui_write_string(35, 121, str, mkcolor(143,143,143), color_bg_time, &font20_maple_bold);	
 }
 
 void main_page_redraw_inner_temperature(const float temperature)
@@ -80,7 +79,7 @@ void main_page_redraw_inner_temperature(const float temperature)
 			char str[3] = {'-', '-'};
 			if (temperature > -10.0f && temperature <= 100.0f)
 					snprintf(str, sizeof(str), "%2.0f", temperature);
-			st7789_write_string(30, 192, str, BLACK, color_bg_inner, &font54_maple_semibold);		
+			ui_write_string(30, 192, str, BLACK, color_bg_inner, &font54_maple_semibold);		
 }
 
 void main_page_redraw_inner_humidity(float humidity)
@@ -88,14 +87,14 @@ void main_page_redraw_inner_humidity(float humidity)
 			char str[3];
 			if (humidity > 0.0f && humidity <= 99.99f)
 					snprintf(str, sizeof(str), "%2.0f", humidity);
-			st7789_write_string(25, 239, str, BLACK, color_bg_inner, &font64_maple_extrabold);		
+			ui_write_string(25, 239, str, BLACK, color_bg_inner, &font64_maple_extrabold);		
 }
 
 void main_page_redraw_outdoor_city(const char *city)
 {
 			char str[9];
 			snprintf(str, sizeof(str), "%s", city);
-			st7789_write_string(127, 170, str, BLACK, color_bg_outdoor, &font24_maple_bold);		
+			ui_write_string(127, 170, str, BLACK, color_bg_outdoor, &font24_maple_bold);		
 }
 
 void main_page_redraw_outdoor_temperature(float temperature)
@@ -103,7 +102,7 @@ void main_page_redraw_outdoor_temperature(float temperature)
 			char str[3] = {'-', '-'};
 			if (temperature > -10.0f && temperature <= 100.0f)
 					snprintf(str, sizeof(str), "%2.0f", temperature);
-			st7789_write_string(135, 190, str, BLACK, color_bg_outdoor, &font54_maple_bold);	
+			ui_write_string(135, 190, str, BLACK, color_bg_outdoor, &font54_maple_bold);	
 }
 
 void main_page_redraw_outdoor_weather_icon(const int code)
@@ -125,5 +124,5 @@ void main_page_redraw_outdoor_weather_icon(const int code)
 					icon = &icon_zhongxue;
 			else // 扬沙、龙卷风等
 					icon = &icon_na;
-			st7789_draw_image(166, 240, icon);
+			ui_draw_image(166, 240, icon);
 }

@@ -4,6 +4,7 @@
 #include "task.h"
 #include "esp_at.h"
 #include "page.h"
+#include "wifi.h"
 
 void wifi_init(void)
 {

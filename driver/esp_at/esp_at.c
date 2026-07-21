@@ -6,7 +6,6 @@
 #include "task.h"
 #include "semphr.h"
 #include "stm32f4xx.h"
-#include "cpu_tick.h"
 #include "esp_at.h"
 
 #define ESP_AT_DEBUG    1

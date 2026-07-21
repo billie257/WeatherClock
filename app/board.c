@@ -3,10 +3,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "stm32f4xx.h"
-#include "cpu_tick.h"
+#include "tim_delay.h"
 #include "console.h"
 #include "rtc.h"
-#include "st7789.h"
 #include "aht20.h"
 
 void board_lowlevel_init(void)
@@ -14,11 +13,13 @@ void board_lowlevel_init(void)
 		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF, ENABLE);
 		RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 		RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
 		RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);		
 		RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
 		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
 		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
 		PWR_BackupAccessCmd(ENABLE);
@@ -28,12 +29,12 @@ void board_lowlevel_init(void)
 }
 
 void board_init(void)
-{		
+{	
+		tim_delay_init();
 	  console_init();
+	  printf("[SYS] Build Date: %s %s\n", __DATE__, __TIME__);
 		rtc_init();
 		aht20_init();
-	  st7789_init();
-		printf("[SYS] Build Date: %s %s\n", __DATE__, __TIME__);
 }
 
 int fputc(int ch, FILE *f)

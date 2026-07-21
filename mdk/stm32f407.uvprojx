@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER,HSE_VALUE=8000000</Define>
               <Undefine></Undefine>
-              <IncludePath>..\app;..\app\font;..\app\image;..\app\page;..\driver\rtc;..\driver\esp_at;..\driver\cpu_tick;..\driver\st7789;..\driver\aht20;..\driver\console;..\firmware\cmsis\core;..\firmware\cmsis\device;..\firmware\driver\inc;..\third_lib\freertos\include;..\third_lib\freertos\portable</IncludePath>
+              <IncludePath>..\app;..\app\font;..\app\image;..\app\page;..\driver\rtc;..\driver\esp_at;..\driver\st7789;..\driver\aht20;..\driver\console;..\driver\tim_delay;..\firmware\cmsis\core;..\firmware\cmsis\device;..\firmware\driver\inc;..\third_lib\freertos\include;..\third_lib\freertos\portable;..\driver\led</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -395,9 +395,14 @@
               <FilePath>..\app\board.c</FilePath>
             </File>
             <File>
-              <FileName>loop.c</FileName>
+              <FileName>app.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\app\loop.c</FilePath>
+              <FilePath>..\app\app.c</FilePath>
+            </File>
+            <File>
+              <FileName>ui.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\app\ui.c</FilePath>
             </File>
             <File>
               <FileName>wifi.c</FileName>
@@ -408,6 +413,11 @@
               <FileName>weather.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\app\weather.c</FilePath>
+            </File>
+            <File>
+              <FileName>workqueue.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\app\workqueue.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -578,6 +588,16 @@
               <FileName>aht20.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\driver\aht20\aht20.c</FilePath>
+            </File>
+            <File>
+              <FileName>tim_delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\driver\tim_delay\tim_delay.c</FilePath>
+            </File>
+            <File>
+              <FileName>led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\driver\led\led.c</FilePath>
             </File>
           </Files>
         </Group>

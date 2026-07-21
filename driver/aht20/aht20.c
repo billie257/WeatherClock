@@ -2,7 +2,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "stm32f4xx.h"
-#include "cpu_tick.h"
+#include "tim_delay.h"
 
 static bool aht20_write(uint8_t data[], uint32_t length);
 static bool aht20_read(uint8_t data[], uint32_t length);
@@ -13,6 +13,16 @@ static bool aht20_is_ready(void);
 
 bool aht20_init(void)
 {	
+		I2C_InitTypeDef I2C_InitStruct;
+	  I2C_StructInit(&I2C_InitStruct);
+		I2C_InitStruct.I2C_Ack = I2C_Ack_Enable;
+		I2C_InitStruct.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+		I2C_InitStruct.I2C_ClockSpeed =  100ul * 1000ul;
+		I2C_InitStruct.I2C_DutyCycle = I2C_DutyCycle_2;
+		I2C_InitStruct.I2C_Mode = I2C_Mode_I2C;
+		I2C_InitStruct.I2C_OwnAddress1 = 0x00;		
+		I2C_Init(I2C2, &I2C_InitStruct);
+	
 		GPIO_InitTypeDef GPIO_InitStruct;
 	  GPIO_StructInit(&GPIO_InitStruct);
 		GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
@@ -25,16 +35,6 @@ bool aht20_init(void)
 		GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_I2C2);
 		GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_I2C2);
 	
-	  I2C_InitTypeDef I2C_InitStruct;
-	  I2C_StructInit(&I2C_InitStruct);
-		I2C_InitStruct.I2C_Ack = I2C_Ack_Enable;
-		I2C_InitStruct.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-		I2C_InitStruct.I2C_ClockSpeed =  100ul * 1000ul;
-		I2C_InitStruct.I2C_DutyCycle = I2C_DutyCycle_2;
-		I2C_InitStruct.I2C_Mode = I2C_Mode_I2C;
-		I2C_InitStruct.I2C_OwnAddress1 = 0x00;		
-		I2C_Init(I2C2, &I2C_InitStruct);
-		
 		vTaskDelay(pdMS_TO_TICKS(40));
 		if (aht20_is_ready())
 			return true;
@@ -42,9 +42,9 @@ bool aht20_init(void)
 		if (!aht20_write((uint8_t[]){0xBE, 0x08, 0x00}, 3))
 			return false;
 		
-		for (uint32_t t = 0; t < 100; t++)
+		for (uint32_t t = 0; t < 20; t++)
 		{
-			vTaskDelay(pdMS_TO_TICKS(1));
+			vTaskDelay(pdMS_TO_TICKS(5));
 			if (aht20_is_ready())
 				return true;
 		}
@@ -57,8 +57,8 @@ bool aht20_init(void)
 			uint32_t timeout = TIMEOUT; \
 			while (!I2C_CheckEvent(I2C2, EVENT) && timeout > 0) \
 			{	\
-					vTaskDelay(pdMS_TO_TICKS(1)); \
-					timeout -= 1000; \
+					tim_delay_us(10); \
+					timeout -= 10; \
 			}	\
 			if (timeout <= 0) \
 					return false; \
@@ -136,9 +136,9 @@ bool aht20_start_measurement(void)
 
 bool aht20_wait_for_measurement(void)
 {
-	for (uint32_t t = 0; t < 200; t++)
+	for (uint32_t t = 0; t < 20; t++)
 	{
-	  vTaskDelay(pdMS_TO_TICKS(1));
+	  vTaskDelay(pdMS_TO_TICKS(10));
 		if (!aht20_is_busy())
 		{
 			return true;
