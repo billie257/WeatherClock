@@ -22,7 +22,8 @@ ST7789彩色屏幕：https://mobile.yangkeduo.com/goods.html?ps=hzo4eGfze3
 
 ## 项目整体分层架构
 
-STM32F4_WT_FreeRTOS/
+```
+STM32F4_WeatherClock_FreeRTOS
 │
 ├── firmware/                    ← 第0层：厂商代码（基本不改）
 │   ├── cmsis/                   ← ARM Cortex-M4 内核支持
@@ -67,27 +68,26 @@ STM32F4_WT_FreeRTOS/
 │
 └── app.h / ui.h / workqueue.h   ← 应用层头文件
 
-
+```
 
 ### 依赖方向：严格单向
 
         app.c（业务编排）
        /    |    \
       ▼     ▼     ▼
-   page/*  wifi  weather     ← 纯逻辑层，只依赖 ui.h / driver
+     page/*  wifi  weather     ← 纯逻辑层，只依赖 ui.h / driver
       │
       ▼
-   ui.c  workqueue.c         ← 基础设施层
+    ui.c  workqueue.c         ← 基础设施层
       │
       ▼
-   driver/st7789  driver/rtc  driver/aht20  driver/esp_at  ← 硬件抽象层
+    driver/st7789  driver/rtc  driver/aht20  driver/esp_at  ← 硬件抽象层
       │
       ▼
-   firmware/stm32f4xx_*       ← 标准外设库
+    firmware/stm32f4xx_*       ← 标准外设库
       │
       ▼
-   CMSIS / 寄存器              ← 硬件
-
+    CMSIS / 寄存器              ← 硬件
 
 
 ### 定时器配置
@@ -103,21 +103,32 @@ time_update_timer = xTimerCreate("time update",
 
 实际运行场景
 
+```
 时间线 ──────────────────────────────────────────────────────►
 
-[开机]          [连上WiFi]       [WiFi断开]        [WiFi重连]
-  │                │                │                │
-  │   time_sync()  │                │   time_sync()  │
-  │   写入 RTC     │                │   失败，1s后重试│
-  │   (SNTP对时)   │                │   RTC 不受影响 │
-  │                │                │                │
-  ├── time_update()─每秒读RTC刷屏──────────────────────┤
-  │    23:59:58 → 23:59:59 → 00:00:00 → 00:00:01 ...  │
-  └────────────────────────────────────────────────────┘
-                RTC 硬件一直自己走，永不间断
+[设备开机]          [WiFi连接成功]       [WiFi意外断开]        [WiFi重新连上]
+    │                    │                      │                      │
+    │     time_sync()    │                      │     time_sync()      │
+    │     SNTP网络对时   │                      │     网络对时失败     │
+    │     同步写入RTC硬件│                      │     间隔1s自动重试  │
+    │                     │                      │     RTC硬件计时不受断网影响 │
+    │                     │                      │                      │
+    └───────────── time_update() 循环任务 ──────────────────────────────┘
+             每秒读取RTC硬件时间，刷新屏幕时钟UI
+             时间流转示例：23:59:58 → 23:59:59 → 00:00:00 → 00:00:01 …
+
+核心特性：RTC硬件独立计时，设备上电/断网全程持续走时，不会中断
+```
+
+
 
 **RTC 只要被成功写入过一次正确时间，之后就算 WiFi 永久断开，它也会靠 LSE 晶振持续走时。** 精度由晶振决定——±20ppm 的 LSE 日误差约 1.7 秒，完全够用。断开 WiFi 唯一的影响是**无法自动校准累积误差**，但走时本身不会停。
 
+
+
+### UI分层渲染架构
+
+```
 ┌──────────────────────────────────────────────────────────────┐
 │  Layer 4: app.c 业务逻辑层                                    │
 │  ┌──────────────────────────────────────────────────────────┐│
@@ -147,10 +158,14 @@ time_update_timer = xTimerCreate("time update",
 │  │ st7789_write_gram(...)  ← DMA + 信号量等待完成            ││
 │  └──────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────┘
+```
+
+
 
 关键解耦机制：`ui_queue`
 
-以前（紧密耦合）：              现在（队列解耦）：
+```
+  以前（紧密耦合）：              现在（队列解耦）：
                                 
 main_page_redraw_time()        main_page_redraw_time()
   │                                │
@@ -163,6 +178,7 @@ main_page_redraw_time()        main_page_redraw_time()
                └─ 调用者阻塞等待              └─► st7789_write_string()
                                                     │
                                                     └─► SPI/DMA 发送
+```
 
 
 
