@@ -180,6 +180,50 @@ main_page_redraw_time()        main_page_redraw_time()
                                                     └─► SPI/DMA 发送
 ```
 
+完整数据流向图
+
+```
+[NTP 服务器]                [心知天气 API]
+       │                            │
+       ▼                            ▼
+  esp_at_sntp_get_time()    esp_at_http_get()
+       │                            │
+       ▼                            ▼
+  rtc_set_time()              parse_seniverse_response()
+       │                            │
+       ▼                            ▼
+  [STM32 硬件 RTC]            outdooor_update()
+       │                            │
+       ▼                            │
+  time_update() ── 每秒 ──► memcmp脏检测 ──► main_page_redraw_*()
+       │                                      │
+       │                                      ▼
+       │                              ui_write_string()
+       │                              ui_draw_image()
+       │                              ui_fill_color()
+       │                                      │
+       │                              [ui_queue 消息队列]
+       │                                      │
+       │                                      ▼
+       │                              ui_func() 任务
+       │                                      │
+       │                                      ▼
+       │                              st7789_write_string()
+       │                              st7789_draw_image()
+       │                              st7789_fill_color()
+       │                                      │
+       │                              [SPI1 DMA + 信号量]
+       │                                      │
+       ▼                                      ▼
+  [屏幕显示 时钟/日期/温湿度/天气]
+```
+
+
+
+
+
+
+
 
 
 
