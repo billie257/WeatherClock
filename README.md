@@ -4,7 +4,7 @@
 
 ## 实现效果
 
-![天气时钟](E:\Work\STM32\Proj\TempClock\11_STM32F4_FreeRTOS\STM32F4_WT_FreeRTOS\assets\天气时钟.jpg)
+![天气时钟](assets/天气时钟.jpg)
 
 这是一个 **STM32F4 + FreeRTOS + ESP8266 + ST7789 彩屏** 的温湿度时钟项目。
 
