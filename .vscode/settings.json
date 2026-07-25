@@ -9,5 +9,7 @@
         "**/.svn": true,
         "**/CVS": true,
         "**/Thumbs.db": true
-    }
+    },
+    "files.encoding": "gbk",
+    "files.autoGuessEncoding": true
 }
