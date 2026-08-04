@@ -4,7 +4,7 @@
 
 ## 实现效果
 
-![天气时钟](assets/天气时钟.jpg)
+<img src="assets/天气时钟.jpg" alt="天气时钟" style="zoom: 33%;" />
 
 这是一个 **STM32F4 + FreeRTOS + ESP8266 + ST7789 彩屏** 的温湿度时钟项目。
 
@@ -18,7 +18,20 @@ ESP32C3开发板2.4GWIFI蓝牙模块：https://mobile.yangkeduo.com/goods2.html?
 
 ST7789彩色屏幕：https://mobile.yangkeduo.com/goods.html?ps=hzo4eGfze3
 
+## 开发环境
 
+- IDE: keil MDK-ARM MDK542a
+- 固件库：STM32F4xx_DSP_StdPeriph_Lib_V1.9.0
+- 编译器：ARM Compiler
+- 辅助工具：VS Code + Codex GLM5.2  Gemini Pro
+- ESP32C3固件：ESP32-C3-MINI-1-AT-V4.1.0.0  固件烧录工具flash_download_tool
+
+## 快速开始
+
+- 用keil打开mdk  project.uvporjx
+- 确认芯片型号为STM32F407ZGT6  STM32F407VET6也可
+- 编译
+- 通过ST-Link/ J-Link将程序下载到开发板
 
 ## 项目整体分层架构
 
@@ -101,7 +114,7 @@ time_update_timer = xTimerCreate("time update",
 
 `time_update_timer` 是 `pdTRUE`（周期性定时器），创建后立刻启动，永远 1 秒一次。它和 WiFi 状态没有任何耦合。
 
-实际运行场景
+#### RTC时间校准
 
 ```
 时间线 ──────────────────────────────────────────────────────►
