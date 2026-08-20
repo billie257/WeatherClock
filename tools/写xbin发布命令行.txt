@@ -1,0 +1,1 @@
+python scripts\gen_magic_header.py mdk\Objects\stm32f407.bin

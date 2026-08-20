@@ -4,6 +4,11 @@ mdk/Listings/
 mdk/Objects/
 mdk/RTE/
 
+mdk/JLinkLog.txt
+mdk/JLinkSettings.ini
+
+generated/**/*.xbin
+
 # 忽略所有后缀为 .scvd 的事件记录器文件
 *.scvd
 

@@ -4,6 +4,7 @@
 import os
 import sys
 import time
+import zlib
 
 MAGIC_HEADER_MAGIC = 0x4D414749  # "MAGI"
 DATA_TYPE_FIRMWARE = 1
@@ -26,7 +27,8 @@ def main():
     
     with open(binfile, "rb") as f:
         bin_data = f.read()
-    
+    bin_crc = zlib.crc32(bin_data) & 0xFFFFFFFF
+
     # ¹¹½¨magic header
     header = []
 
@@ -38,7 +40,7 @@ def main():
     header.append((4096).to_bytes(4, byteorder='little'))  # data_offset
     header.append((0x08010000).to_bytes(4, byteorder='little'))  # data_address
     header.append((len(bin_data)).to_bytes(4, byteorder='little'))  # data_length
-    header.append((0).to_bytes(4, byteorder='little'))  # data_crc32
+    header.append((bin_crc).to_bytes(4, byteorder='little'))  # data_crc32
     header.append((0).to_bytes(4 * 11, byteorder='little'))  # reserved2
 
     version_date = time.strftime("%y%m%d", time.localtime())
@@ -50,7 +52,9 @@ def main():
 
     header.append((0).to_bytes(4 * 6, byteorder='little'))  # reserved3
     header.append((0x0800C000).to_bytes(4, byteorder='little'))  # this_address
-    header.append((0).to_bytes(4, byteorder='little'))  # this_crc32
+
+    this_crc = zlib.crc32(b''.join(header)) & 0xFFFFFFFF
+    header.append((this_crc).to_bytes(4, byteorder='little'))  # this_crc32
 
     magic_header = b''.join(header)
     magic_header = magic_header.ljust(4096, b'\x00')
