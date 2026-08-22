@@ -1,0 +1,40 @@
+# Project: test
+# Makefile created by Red Panda C++ 3.3.3147
+
+CXX      = "g++.exe"
+CC       = "gcc.exe"
+WINDRES  = "windres.exe"
+RM       = del /q /f
+CD       = cd /d
+LIBS     = "-Wl,--stack,12582912"
+INCS     = 
+CXXINCS  = 
+CXXFLAGS = $(CXXINCS) "-g3" "-pipe" "-Wall" "-D_DEBUG"
+CFLAGS   = $(INCS) "-g3" "-pipe" "-Wall" "-D_DEBUG"
+WINDRESFLAGS = 
+RES      = test_private.res
+OBJ      = crc32.o main.o $(RES)
+BIN      = test.exe
+LINKOBJ  = "crc32.o" "main.o" "test_private.res"
+CLEANOBJ = "crc32.o" "main.o" "test_private.res" "test.exe"
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before $(BIN) all-after
+
+clean: clean-custom
+	-$(RM) $(CLEANOBJ) >NUL 2>&1
+
+test.exe: $(OBJ)
+
+	$(CXX) $(LINKOBJ) -o "test.exe" $(LIBS)
+
+crc32.o: crc32.c crc32.h
+	$(CC) -c "crc32.c" -o "crc32.o" $(CFLAGS)  -finput-charset=UTF-8 -fexec-charset=gbk
+
+main.o: main.c crc32.h
+	$(CC) -c "main.c" -o "main.o" $(CFLAGS)  -finput-charset=UTF-8 -fexec-charset=gbk
+
+test_private.res: test_private.rc 
+	$(WINDRES) -i "test_private.rc" --input-format=rc -o "test_private.res" -O coff $(WINDRESFLAGS) 
+

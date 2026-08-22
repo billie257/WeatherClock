@@ -1,0 +1,22 @@
+[
+    {
+        "caretX": 1,
+        "caretY": 1,
+        "filename": "E:/Work/STM32/Proj/Bootloader/02_STM32F407_BOOTLOADER/xbin/STM32F4_WeatherClock_FreeRTOS/tools/test/crc32.c",
+        "focused": false,
+        "isOpen": true,
+        "left": 0,
+        "order": 0,
+        "top": 1350
+    },
+    {
+        "caretX": 1,
+        "caretY": 1,
+        "filename": "E:/Work/STM32/Proj/Bootloader/02_STM32F407_BOOTLOADER/xbin/STM32F4_WeatherClock_FreeRTOS/tools/test/main.c",
+        "focused": true,
+        "isOpen": true,
+        "left": 0,
+        "order": 1,
+        "top": 1275
+    }
+]
