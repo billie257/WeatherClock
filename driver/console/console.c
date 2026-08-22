@@ -87,26 +87,26 @@ void console_init(void)
 		console_io_init();
 }
 
-void console_write(const char str[])
+void console_write(const char str[], uint32_t size)
 {
-		uint32_t len = strlen(str);
-		do 
-		{
-				uint32_t chunk_size = len < 65535 ? len : 65535;
-				DMA2_Stream7->M0AR = (uint32_t)str;
-				DMA2_Stream7->NDTR = chunk_size;
-			
-				DMA_Cmd(DMA2_Stream7, ENABLE);		
-				xSemaphoreTake(write_async_semaphore, portMAX_DELAY);
-//				while (DMA_GetFlagStatus(DMA2_Stream7, DMA_FLAG_TCIF7) == RESET);
-//				DMA_ClearFlag(DMA2_Stream7, DMA_FLAG_TCIF7);		
-			
-				str += chunk_size;
-				len -= chunk_size;		
-		} while (len > 0);	
+	uint32_t len = size;
+	do 
+	{
+		uint32_t chunk_size = len < 65535 ? len : 65535;
+		DMA2_Stream7->M0AR = (uint32_t)str;
+		DMA2_Stream7->NDTR = chunk_size;
+	
+		DMA_Cmd(DMA2_Stream7, ENABLE);		
+		xSemaphoreTake(write_async_semaphore, portMAX_DELAY);
+//		while (DMA_GetFlagStatus(DMA2_Stream7, DMA_FLAG_TCIF7) == RESET);
+//		DMA_ClearFlag(DMA2_Stream7, DMA_FLAG_TCIF7);		
+	
+		str += chunk_size;
+		len -= chunk_size;		
+	} while (len > 0);	
 
-		while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
-		USART_ClearFlag(USART1, USART_FLAG_TC);
+	while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
+	USART_ClearFlag(USART1, USART_FLAG_TC);
 }
 
 void console_received_callback_register(console_received_func_t func)
