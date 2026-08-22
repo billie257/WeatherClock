@@ -40,7 +40,7 @@ err:
 	error_page_display("wireless init failed");
 	while (1)
 	{
-			;
+		;
 	}
 }	
 

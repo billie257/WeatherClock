@@ -6,6 +6,8 @@
 
 <img src="assets/天气时钟.jpg" alt="天气时钟" style="zoom: 33%;" />
 
+<img src="assets/日志打印1.jpg" alt="日志打印1" style="zoom: 50%;" />
+
 这是一个 **STM32F4 + FreeRTOS + ESP8266 + ST7789 彩屏** 的温湿度时钟项目。
 
 ## 硬件来源
