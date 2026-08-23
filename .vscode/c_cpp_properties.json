@@ -17,6 +17,7 @@
                 "app/font",
                 "app/image",
                 "app/page",
+                "app/component",
                 "driver/rtc",
                 "driver/esp_at",
                 "driver/st7789",
@@ -28,7 +29,8 @@
                 "firmware/driver/inc",
                 "third_lib/freertos/include",
                 "third_lib/freertos/portable",
-                "third_lib/easylogger/inc"
+                "third_lib/easylogger/inc",
+                "third_lib/lettershell"
             ],
             "intelliSenseMode": "windows-gcc-arm",
             "name": "stm32f407"

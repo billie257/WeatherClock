@@ -8,7 +8,11 @@
 #include "stm32f4xx.h"
 #include "esp_at.h"
 
-#define ESP_AT_DEBUG    1
+#define LOG_TAG "esp-at"
+#define LOG_LVL ELOG_LVL_INFO
+#include "elog.h"
+
+#define ESP_AT_DEBUG    0
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -40,109 +44,112 @@ static char rxbuf[1024];
 static uint32_t rxlen;
 static at_ack_t rxack;
 static SemaphoreHandle_t at_ack_semaphore;
+static SemaphoreHandle_t at_busy_lock;
 
 static bool esp_at_write_command(const char *command, uint32_t timeout);
-static void esp_at_usart_write(const char *data);
 static bool esp_at_wait_boot(uint32_t timeout);
 static bool	esp_at_wait_ready(uint32_t timeout);
 
 static void esp_at_io_init(void)
 {
-		GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
-		GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
 
-		GPIO_InitTypeDef GPIO_InitStructure;
-		GPIO_StructInit(&GPIO_InitStructure);
-		GPIO_InitStructure.GPIO_Speed = GPIO_High_Speed;
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
-		GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_StructInit(&GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Speed = GPIO_High_Speed;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
 
 static void esp_at_usart_init(void)
 {
-		USART_InitTypeDef USART_InitStructure;
-		USART_StructInit(&USART_InitStructure);
+	USART_InitTypeDef USART_InitStructure;
+	USART_StructInit(&USART_InitStructure);
 
-		USART_InitStructure.USART_BaudRate = 115200u;
-		USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-		USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-		USART_InitStructure.USART_Parity = USART_Parity_No;
-		USART_InitStructure.USART_StopBits = USART_StopBits_1;
-		USART_InitStructure.USART_WordLength = USART_WordLength_8b;		
-			
-		USART_Init(USART2, &USART_InitStructure);  
-		USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
-		USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
-		USART_Cmd(USART2, ENABLE);
+	USART_InitStructure.USART_BaudRate = 115200u;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;		
+		
+	USART_Init(USART2, &USART_InitStructure);  
+	USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
+	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
+	USART_Cmd(USART2, ENABLE);
 }
 
 static void esp_at_dma_init(void)
 {
-		DMA_InitTypeDef DMA_InitStruct;
-		DMA_StructInit(&DMA_InitStruct);
-		DMA_InitStruct.DMA_Channel = DMA_Channel_4;
-		DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)&USART2->DR;
-		DMA_InitStruct.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-		DMA_InitStruct.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-		DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-		DMA_InitStruct.DMA_MemoryInc = DMA_MemoryInc_Enable;
-		DMA_InitStruct.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-		DMA_InitStruct.DMA_Mode = DMA_Mode_Normal;
-		DMA_InitStruct.DMA_Priority = DMA_Priority_Medium;
-		DMA_InitStruct.DMA_FIFOMode = DMA_FIFOMode_Enable;
-		DMA_InitStruct.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
-		DMA_InitStruct.DMA_MemoryBurst = DMA_MemoryBurst_INC8;
-		DMA_InitStruct.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+	DMA_InitTypeDef DMA_InitStruct;
+	DMA_StructInit(&DMA_InitStruct);
+	DMA_InitStruct.DMA_Channel = DMA_Channel_4;
+	DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)&USART2->DR;
+	DMA_InitStruct.DMA_DIR = DMA_DIR_MemoryToPeripheral;
+	DMA_InitStruct.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+	DMA_InitStruct.DMA_MemoryInc = DMA_MemoryInc_Enable;
+	DMA_InitStruct.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+	DMA_InitStruct.DMA_Mode = DMA_Mode_Normal;
+	DMA_InitStruct.DMA_Priority = DMA_Priority_Medium;
+	DMA_InitStruct.DMA_FIFOMode = DMA_FIFOMode_Enable;
+	DMA_InitStruct.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
+	DMA_InitStruct.DMA_MemoryBurst = DMA_MemoryBurst_INC8;
+	DMA_InitStruct.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
 
-		DMA_Init(DMA1_Stream6, &DMA_InitStruct);
+	DMA_Init(DMA1_Stream6, &DMA_InitStruct);
 }
 
 static void esp_at_int_init(void)
 {
-		NVIC_InitTypeDef NVIC_InitStruct;
-		NVIC_InitStruct.NVIC_IRQChannel = USART2_IRQn;
-		NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 5;
-		NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
-		NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-		NVIC_Init(&NVIC_InitStruct);
-		NVIC_SetPriority(USART2_IRQn, 5);
+	NVIC_InitTypeDef NVIC_InitStruct;
+	NVIC_InitStruct.NVIC_IRQChannel = USART2_IRQn;
+	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 5;
+	NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStruct);
+	NVIC_SetPriority(USART2_IRQn, 5);
 }
 
 static void esp_at_lowlevel_init(void)
 {
-		esp_at_usart_init();
-		esp_at_dma_init();
-	  esp_at_int_init();
-		esp_at_io_init();
+	esp_at_usart_init();
+	esp_at_dma_init();
+	esp_at_int_init();
+	esp_at_io_init();
 }
 
 bool esp_at_init(void)
 {	
-		at_ack_semaphore = xSemaphoreCreateBinary();
-		configASSERT(at_ack_semaphore);
-	
-		esp_at_lowlevel_init();
+	at_ack_semaphore = xSemaphoreCreateBinary();
+	configASSERT(at_ack_semaphore);
+
+	at_busy_lock = xSemaphoreCreateMutex();
+	configASSERT(at_busy_lock);
+
+	esp_at_lowlevel_init();
 	
 	if (!esp_at_wait_boot(3000))
-			return false;
+		return false;
 	if (!esp_at_write_command("AT+RESTORE\r\n", 2000))
-			return false;
+		return false;
 	if (!esp_at_wait_ready(3000))
-			return false;
+		return false;
 	
 	return true;
 }
 
 static void esp_at_usart_write(const char *data)
 {
-		uint32_t len = strlen(data);
+	uint32_t len = strlen(data);
+
+	DMA1_Stream6->M0AR = (uint32_t)data;
+	DMA1_Stream6->NDTR = len;
 	
-		DMA1_Stream6->M0AR = (uint32_t)data;
-		DMA1_Stream6->NDTR = len;
-		
-		DMA_ClearFlag(DMA1_Stream6, DMA_FLAG_TCIF6);
-		DMA_Cmd(DMA1_Stream6, ENABLE);		
+	DMA_ClearFlag(DMA1_Stream6, DMA_FLAG_TCIF6);
+	DMA_Cmd(DMA1_Stream6, ENABLE);		
 	
 //		while(data && *data)
 //		{
@@ -158,26 +165,27 @@ static void esp_at_usart_write(const char *data)
 
 static at_ack_t match_internal_ack(const char *str)
 {
-		for (uint32_t i = 0; i < ARRAY_SIZE(at_ack_matches); i++)
-		{
-				if (strcmp(str, at_ack_matches[i].string) == 0)
-					return at_ack_matches[i].ack;
-		}
-		
-		return AT_ACK_NONE;
+	for (uint32_t i = 0; i < ARRAY_SIZE(at_ack_matches); i++)
+	{
+		if (strcmp(str, at_ack_matches[i].string) == 0)
+			return at_ack_matches[i].ack;
+	}
+	
+	return AT_ACK_NONE;
 }
 
 static at_ack_t esp_at_usart_wait_receive(uint32_t timeout)
 {
-		rxlen = 0;
-		rxline = rxbuf;
-		bool acked = xSemaphoreTake(at_ack_semaphore, pdMS_TO_TICKS(timeout)) == pdPASS;
-	  return acked ? rxack : AT_ACK_NONE;
+	rxlen = 0;
+	rxline = rxbuf;
+
+	bool acked = xSemaphoreTake(at_ack_semaphore, pdMS_TO_TICKS(timeout)) == pdPASS;
+	return acked ? rxack : AT_ACK_NONE;
 }
 
 static bool	esp_at_wait_ready(uint32_t timeout)
 {
-		return esp_at_usart_wait_receive(timeout) == AT_ACK_READY;
+	return esp_at_usart_wait_receive(timeout) == AT_ACK_READY;
 }
 
 static bool esp_at_write_command(const char *command, uint32_t timeout)
@@ -185,8 +193,16 @@ static bool esp_at_write_command(const char *command, uint32_t timeout)
 #if ESP_AT_DEBUG
 		printf("[DEBUG] Send: %s\n", command);
 #endif
-		esp_at_usart_write(command);
-		at_ack_t ack = esp_at_usart_wait_receive(timeout);
+	xSemaphoreTake(at_busy_lock, portMAX_DELAY);
+
+	log_d("send: %s", command);
+
+	esp_at_usart_write(command);
+	at_ack_t ack = esp_at_usart_wait_receive(timeout);
+
+	log_d("response: %s", rxbuf);
+
+	xSemaphoreGive(at_busy_lock);
 	
 #if ESP_AT_DEBUG
 	printf("[DEBUG] Response: \n%s\n", rxbuf);
@@ -197,33 +213,35 @@ static bool esp_at_write_command(const char *command, uint32_t timeout)
 
 static const char *esp_at_get_reponse(void)
 {
-		return rxbuf;
+	return rxbuf;
 }
 
 static bool esp_at_wait_boot(uint32_t timeout)
 {
-		for (int t = 0; t < timeout; t += 100)
-		{
-				if (esp_at_write_command("AT\r\n", 100))
-					return true;
-		}
-		return false;
+	for (int t = 0; t < timeout; t += 100)
+	{
+		if (esp_at_write_command("AT\r\n", 100))
+			return true;
+	}
+	return false;
 }
 
 bool esp_at_wifi_init(void)
 {
-		return esp_at_write_command("AT+CWMODE=1\r\n", 2000);
+	return esp_at_write_command("AT+CWMODE=1\r\n", 2000);
 }
 
 bool esp_at_connect_wifi(const char *ssid, const char *pwd, const char *mac)
 {
-		if (ssid == NULL || pwd == NULL)
-				return false;
-		char *cmd = rxbuf;
-		int len = snprintf(cmd, sizeof(rxbuf), "AT+CWJAP=\"%s\",\"%s\"\r\n", ssid, pwd);
-		if (mac)
-				snprintf(cmd + len, sizeof(rxbuf) - len, ",\"%s\"", mac);
-		return esp_at_write_command(cmd, 5000);
+	if (ssid == NULL || pwd == NULL)
+		return false;
+
+	char *cmd = rxbuf;
+	int len = snprintf(cmd, sizeof(rxbuf), "AT+CWJAP=\"%s\",\"%s\"\r\n", ssid, pwd);
+	if (mac)
+		snprintf(cmd + len, sizeof(rxbuf) - len, ",\"%s\"", mac);
+
+	return esp_at_write_command(cmd, 5000);
 }
 
 static bool parse_cwstate_response(const char *response, esp_wifi_info_t *info)
@@ -237,7 +255,7 @@ static bool parse_cwstate_response(const char *response, esp_wifi_info_t *info)
 		return false;
 
 	int wifi_state;
-	if (sscanf(p, "+CWSTATE:%d,\"%[^\"]\"", &wifi_state, info->ssid) != 2)
+	if (sscanf(p, "+CWSTATE:%d,\"%63[^\"]\"", &wifi_state, info->ssid) != 2)
 		return false;
 	
 	info->connected = (wifi_state == 2);
@@ -262,6 +280,35 @@ static bool parse_cwjap_response(const char *response, esp_wifi_info_t *info)
 		return false;
 	
 	return true;
+}
+
+bool esp_at_get_wifi_info(esp_wifi_info_t *info)
+{
+	if (!esp_at_write_command("AT+CWSTATE?\r\n", 2000))
+		return false;
+	
+	if (!parse_cwstate_response(esp_at_get_reponse(), info))
+		return false;
+	
+	if (info->connected == true)
+	{
+		if (!esp_at_write_command("AT+CWJAP?\r\n", 2000))
+		return false;
+	
+		if (!parse_cwjap_response(esp_at_get_reponse(), info))
+		return false;
+	}
+	
+	return true;
+}
+
+bool wifi_is_connected(void)
+{
+	esp_wifi_info_t info;
+	if (esp_at_get_wifi_info(&info))
+		return info.connected;
+	
+	return false;
 }
 
 static uint8_t month_str_to_num(const char *month_str)
@@ -310,52 +357,23 @@ static bool parse_cipsntptime_response(const char *response, esp_date_time_t *da
 	return true;
 }
 
-bool esp_at_get_wifi_info(esp_wifi_info_t *info)
-{
-		if (!esp_at_write_command("AT+CWSTATE?\r\n", 2000))
-				return false;
-		
-		if (!parse_cwstate_response(esp_at_get_reponse(), info))
-				return false;
-		
-		if (info->connected == true)
-		{
-			if (!esp_at_write_command("AT+CWJAP?\r\n", 2000))
-				return false;
-		
-			if (!parse_cwjap_response(esp_at_get_reponse(), info))
-				return false;
-		}
-		
-		return true;
-}
-
-bool wifi_is_connected(void)
-{
-		esp_wifi_info_t info;
-		if (esp_at_get_wifi_info(&info))
-			return info.connected;
-		
-		return false;
-}
-
 bool esp_at_sntp_init(void)
 {
-		if (!esp_at_write_command("AT+CIPSNTPCFG=1,8\r\n", 2000))
-				return false;
-		
-		return true;
+	if (!esp_at_write_command("AT+CIPSNTPCFG=1,8\r\n", 2000))
+		return false;
+	
+	return true;
 }
 
 bool esp_at_sntp_get_time(esp_date_time_t *date)
 {
-	 if (!esp_at_write_command("AT+CIPSNTPTIME?\r\n", 2000))
-				return false;
-	 
-	 if (!parse_cipsntptime_response(esp_at_get_reponse(), date))
-			return false;
-		
-		return true;	
+	if (!esp_at_write_command("AT+CIPSNTPTIME?\r\n", 2000))
+		return false;
+	
+	if (!parse_cipsntptime_response(esp_at_get_reponse(), date))
+		return false;
+	
+	return true;	
 }
 
 const char *esp_at_http_get(const char *url)
@@ -365,34 +383,33 @@ const char *esp_at_http_get(const char *url)
 
 //OK
 	
-		char *txbuf = rxbuf;
-		snprintf(txbuf, sizeof(rxbuf), "AT+HTTPCLIENT=2,1,\"%s\",,,2\r\n", url);
-		bool ret = esp_at_write_command(txbuf, 5000);
-		return ret ? esp_at_get_reponse() : NULL;
+	char *txbuf = rxbuf;
+	snprintf(txbuf, sizeof(rxbuf), "AT+HTTPCLIENT=2,1,\"%s\",,,2\r\n", url);
+	bool ret = esp_at_write_command(txbuf, 5000);
+	return ret ? esp_at_get_reponse() : NULL;
 }
 
 void USART2_IRQHandler(void)
 {	
-		if (USART_GetITStatus(USART2, USART_IT_RXNE) == SET)
-		{
-				if (rxlen < sizeof(rxbuf) - 1)
-				{	
-						rxbuf[rxlen++] = USART_ReceiveData(USART2);
-						if (rxbuf[rxlen - 1] == '\n')
-						{
-								rxbuf[rxlen] = '\0';
-								at_ack_t ack = match_internal_ack(rxline);
-
-								if (ack != AT_ACK_NONE)
-								{
-									  rxack = ack;
-										BaseType_t pxHigherPriorityTaskWoken;
-										xSemaphoreGiveFromISR(at_ack_semaphore, &pxHigherPriorityTaskWoken);
-										portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-								}				
-								rxline = rxbuf + rxlen;
-						}			
-				}			
-				USART_ClearITPendingBit(USART2, USART_IT_RXNE);
-		}		
+	if (USART_GetITStatus(USART2, USART_IT_RXNE) == SET)
+	{
+		if (rxlen < sizeof(rxbuf) - 1)
+		{	
+			rxbuf[rxlen++] = USART_ReceiveData(USART2);
+			if (rxbuf[rxlen - 1] == '\n')
+			{
+				rxbuf[rxlen] = '\0';
+				at_ack_t ack = match_internal_ack(rxline);
+				if (ack != AT_ACK_NONE)
+				{
+					rxack = ack;
+					BaseType_t pxHigherPriorityTaskWoken;
+					xSemaphoreGiveFromISR(at_ack_semaphore, &pxHigherPriorityTaskWoken);
+					portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+				}				
+				rxline = rxbuf + rxlen;
+			}			
+		}			
+		USART_ClearITPendingBit(USART2, USART_IT_RXNE);
+	}		
 }
